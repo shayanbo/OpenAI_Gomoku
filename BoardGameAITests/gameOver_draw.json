@@ -1,0 +1,6 @@
+{
+    "type": "gameOver",
+    "data": {
+        "type": "draw"
+    }
+}

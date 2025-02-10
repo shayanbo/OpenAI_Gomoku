@@ -1,0 +1,13 @@
+{
+    "type": "battle",
+    "data": {
+        "steps": 15,
+        "time": 120,
+        "ai_win_rate": 0.65,
+        "user_win_rate": 0.35,
+        "step": {
+            "row": 4,
+            "column": 6
+        }
+    }
+}
