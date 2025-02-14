@@ -17,8 +17,8 @@ struct GameScene: View {
                     
                     Board(
                         size: BoardSize(
-                            rows: UInt(geometry.size.width / cellSize),
-                            columns: UInt(geometry.size.width / cellSize)
+                            rows: Int(geometry.size.width / cellSize),
+                            columns: Int(geometry.size.width / cellSize)
                         ),
                         cell: cellSize,
                         pieces: viewModel.pieces

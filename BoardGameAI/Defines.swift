@@ -22,15 +22,15 @@ enum CellType {
     case bottom
 }
 
-enum CellState {
-    case empty
+enum CellState: Equatable {
+    case empty 
     case white(selected: Bool)
     case black(selected: Bool)
 }
 
 struct CellLocation: Hashable, Codable {
-    let row: UInt
-    let column: UInt
+    let row: Int
+    let column: Int
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(row)
@@ -39,21 +39,15 @@ struct CellLocation: Hashable, Codable {
 }
 
 struct BoardSize {
-    let rows: UInt
-    let columns: UInt
+    let rows: Int
+    let columns: Int
 }
 
 enum GameState {
-    
-    enum Completion {
-        case success(AIResponse.GameOver)
-        case failure(Error)
-    }
-    
     case ready
     case player1Turn
     case player2Turn
-    case finished(Completion)
+    case finished
 }
 
 extension GameState {
@@ -84,7 +78,7 @@ extension GameState {
 
 extension CellType {
     
-    init(size: BoardSize, row: UInt, column: UInt) {
+    init(size: BoardSize, row: Int, column: Int) {
         if row == 0 && column == 0 {
             self = .topLeft
         } else if row == 0 && column == size.columns - 1 {

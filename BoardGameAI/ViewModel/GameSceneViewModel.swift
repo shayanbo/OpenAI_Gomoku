@@ -27,11 +27,17 @@ import Combine
     /// Dependencies
     private let player1Service: OpenAIService
     private let player2Service: OpenAIService
+    private let checkService: CheckService
     
     /// Constructor
-    init(player1Service: OpenAIService = DefaultOpenAIService(), player2Service: OpenAIService = DefaultOpenAIService()) {
+    init(
+        player1Service: OpenAIService = DefaultOpenAIService(),
+        player2Service: OpenAIService = DefaultOpenAIService(),
+        checkService: CheckService = DefaultCheckService()
+    ) {
         self.player1Service = player1Service
         self.player2Service = player2Service
+        self.checkService = checkService
     }
     
     /// Action
@@ -109,164 +115,111 @@ import Combine
     }
     
     private func tapStopButton() async {
-        state = .finished(.failure(AIError.userStopped))
+        state = .finished
     }
     
     private func start() async {
         do {
             while !state.isFinished {
                 
-                /// player1's turn
-                if state.player1Turn {
-                    
-                    /// player1 start thinking
-                    player1.thinking = true
-                    
-                    /// try to get next step from ai
-                    let response = try await player1Service.resolve(userStep: lastStep)
-                    
-                    /// handle response
-                    switch response {
-                    case let .battle(battle):
-                        
-                        /// update player card info
-                        player1.rate = battle.aiWinRate
-                        player2.rate = battle.userWinRate
-                        player1.steps = battle.moveCount
-                        player1.thinkingTime = battle.time
-                        player1.thinking = false
-                        
-                        /// update board
-                        pieces[battle.move] = .black(selected: false)
-                        
-                        /// misc for player2
-                        lastStep = battle.move
-                        
-                        /// update game state
-                        state = .player2Turn
-                        
-                    case let .gameOver(gameOver):
-                        state = .finished(.success(gameOver))
-                        
-                        switch gameOver {
-                        case .win(let result):
-                            
-                            /// update highlighted pieces
-                            result.highlight.forEach { location in
-                                pieces[location] = result.winner == .ai ? .black(selected: true) : .white(selected: true)
-                            }
-                            
-                            /// alert result
-                            alert = AlertState(
-                                title: "\(result.winner == .ai ? "OpenAI No.1" : "OpenAI No.2") Win!!!",
-                                message: "Would you want one more round?",
-                                buttonLayout: .primaryAndSecondary(
-                                    primary: .init(
-                                        title: "Confirm",
-                                        action: .tapRestartButton,
-                                        style: .default
-                                    ),
-                                    secondary: .init(
-                                        title: "Cancel",
-                                        action: nil,
-                                        style: .destructive
-                                    )
-                                )
-                            )
-                        case .draw:
-                            alert = AlertState(
-                                title: "Draw",
-                                message: "Would you want one more round",
-                                buttonLayout: .primaryAndSecondary(
-                                    primary: .init(
-                                        title: "Confirm",
-                                        action: .tapRestartButton,
-                                        style: .default
-                                    ),
-                                    secondary: .init(
-                                        title: "Cancel",
-                                        action: nil,
-                                        style: .destructive
-                                    )
-                                )
-                            )
-                        }
-                    }
+                /// player1 start thinking
+                player1.thinking = state.player1Turn
+                player2.thinking = state.player2Turn
+                
+                /// try to get next step from ai
+                var battle = if state.player1Turn {
+                    try await player1Service.nextStep(userStep: lastStep, instruction: .nextStep, board: pieces)
                 } else {
-                    
-                    /// player2 start thinking
-                    player2.thinking = true
-                    
-                    /// try to get next step from ai
-                    let response = try await player2Service.resolve(userStep: lastStep)
-                    
-                    /// handle response
-                    switch response {
-                    case let .battle(battle):
-                        
-                        /// update player card info
-                        player2.rate = battle.aiWinRate
-                        player1.rate = battle.userWinRate
-                        player2.steps = battle.moveCount
-                        player2.thinkingTime = battle.time
-                        player2.thinking = false
-                        
-                        /// update board
-                        pieces[battle.move] = .white(selected: false)
-                        
-                        /// misc for player1
-                        lastStep = battle.move
-                        
-                        /// update game state
-                        state = .player1Turn
-                        
-                    case let .gameOver(gameOver):
-                        state = .finished(.success(gameOver))
-                        
-                        switch gameOver {
-                        case .win(let result):
-                            
-                            /// update highlighted pieces
-                            result.highlight.forEach { location in
-                                pieces[location] = result.winner == .ai ? .white(selected: true) : .black(selected: true)
-                            }
-                            
-                            /// alert result
-                            alert = AlertState(
-                                title: "\(result.winner == .ai ? "OpenAI No.2" : "OpenAI No.1") Win!!!",
-                                message: "Would you want one more round?",
-                                buttonLayout: .primaryAndSecondary(
-                                    primary: .init(
-                                        title: "Confirm",
-                                        action: .tapRestartButton,
-                                        style: .default
-                                    ),
-                                    secondary: .init(
-                                        title: "Cancel",
-                                        action: nil,
-                                        style: .destructive
-                                    )
-                                )
-                            )
-                        case .draw:
-                            alert = AlertState(
-                                title: "Draw",
-                                message: "Would you want one more round",
-                                buttonLayout: .primaryAndSecondary(
-                                    primary: .init(
-                                        title: "Confirm",
-                                        action: .tapRestartButton,
-                                        style: .default
-                                    ),
-                                    secondary: .init(
-                                        title: "Cancel",
-                                        action: nil,
-                                        style: .destructive
-                                    )
-                                )
-                            )
-                        }
+                    try await player2Service.nextStep(userStep: lastStep, instruction: .nextStep, board: pieces)
+                }
+                
+                /// get correct step if wrong
+                while pieces[battle.move] != nil {
+                    if state.player1Turn {
+                        battle = try await player1Service.nextStep(userStep: battle.move, instruction: .wrongStep, board: pieces)
+                    } else {
+                        battle = try await player2Service.nextStep(userStep: battle.move, instruction: .wrongStep, board: pieces)
                     }
+                }
+
+                /// update player card info
+                player1.rate = state.player1Turn ? battle.aiWinRate : battle.userWinRate
+                player2.rate = state.player2Turn ? battle.aiWinRate : battle.userWinRate
+                if state.player1Turn {
+                    player1.steps += 1
+                    player1.thinkingTime = battle.time
+                } else {
+                    player2.steps += 1
+                    player2.thinkingTime = battle.time
+                }
+                
+                player1.thinking = !state.player1Turn
+                player2.thinking = !state.player2Turn
+                
+                /// update board
+                if state.player1Turn {
+                    pieces[battle.move] = .black(selected: false)
+                } else {
+                    pieces[battle.move] = .white(selected: false)
+                }
+                
+                /// misc for the other player
+                lastStep = battle.move
+                
+                /// check win
+                let result = checkService.checkBoard(for: battle.move, in: pieces, by: state.player1Turn)
+                switch result {
+                case .draw:
+                    state = .finished
+                    alert = AlertState(
+                        title: "Draw",
+                        message: "Would you want one more round",
+                        buttonLayout: .primaryAndSecondary(
+                            primary: .init(
+                                title: "Confirm",
+                                action: .tapRestartButton,
+                                style: .default
+                            ),
+                            secondary: .init(
+                                title: "Cancel",
+                                action: nil,
+                                style: .destructive
+                            )
+                        )
+                    )
+                case .none: /// update game state
+                    if state.player1Turn {
+                        state = .player2Turn
+                    } else {
+                        state = .player1Turn
+                    }
+                case let .win(player1Or2, cells):
+                    
+                    /// finish the game
+                    state = .finished
+                    
+                    /// update highlighted pieces
+                    cells.forEach { location in
+                        pieces[location] = player1Or2 ? .black(selected: true) : .white(selected: true)
+                    }
+                    
+                    /// alert result
+                    alert = AlertState(
+                        title: "\(player1Or2 ? "OpenAI No.1" : "OpenAI No.2") Win!!!",
+                        message: "Would you want one more round?",
+                        buttonLayout: .primaryAndSecondary(
+                            primary: .init(
+                                title: "Confirm",
+                                action: .tapRestartButton,
+                                style: .default
+                            ),
+                            secondary: .init(
+                                title: "Cancel",
+                                action: nil,
+                                style: .destructive
+                            )
+                        )
+                    )
                 }
             }
         } catch {
@@ -281,7 +234,8 @@ import Combine
             }
             
             /// game is interrupted by an error
-            state = .finished(.failure(error))
+            state = .finished
+            
             /// pop up an alert
             alert = AlertState(
                 title: alertTitle,

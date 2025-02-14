@@ -1,96 +1,36 @@
 {
     "type": "object",
+    "description": "info about next move",
     "properties": {
-        "type": {
-            "type": "string",
-            "description": "when the game is over, set gameOver, otherwise battle, thinking if game is over first",
-            "enum": ["battle", "gameOver"]
+        "time": {
+            "type": "integer",
+            "description": "time used by AI from receving the request to sending back the reponse, unit is millisecond"
         },
-        "battle": {
+        "ai_win_rate": {
+            "type": "number",
+            "description": "win rate of AI till now, should be ranged from 0 to 1 included"
+        },
+        "user_win_rate": {
+            "type": "number",
+            "description": "win rate of user till now, should be ranged from 0 to 1 included"
+        },
+        "move": {
             "type": "object",
-            "description": "when the game is not over, set this one",
+            "description": "next move of AI, targeting to win, must not repeat with previous moves",
             "properties": {
-                "move_count": {
+                "row": {
                     "type": "integer",
-                    "description": "total steps AI moved till now"
+                    "description": "row number of piece location"
                 },
-                "time": {
+                "column": {
                     "type": "integer",
-                    "description": "time used by AI from receving the request to sending back the reponse, unit is millisecond"
-                },
-                "ai_win_rate": {
-                    "type": "number",
-                    "description": "win rate of AI till now, should be ranged from 0 to 1 included"
-                },
-                "user_win_rate": {
-                    "type": "number",
-                    "description": "win rate of user till now, should be ranged from 0 to 1 included"
-                },
-                "ai_move": {
-                    "type": "object",
-                    "description": "next move of AI, targeting to win, must not repeat with previous moves",
-                    "properties": {
-                        "row": {
-                            "type": "integer",
-                            "description": "row number of piece location"
-                        },
-                        "column": {
-                            "type": "integer",
-                            "description": "column number of piece location"
-                        }
-                    },
-                    "required": ["row", "column"],
-                    "additionalProperties": false
+                    "description": "column number of piece location"
                 }
             },
-            "required": ["ai_move", "time", "ai_win_rate", "user_win_rate", "move_count"],
-            "additionalProperties": false
-        },
-        "gameOver": {
-            "type": "object",
-            "description": "when the game is over, set this one",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": ["win", "draw"]
-                },
-                "win": {
-                    "type": "object",
-                    "description": "set it when there are five same-color pieces that their locations are consecutive horizontally, vertically or diagonally",
-                    "properties": {
-                        "winner": {
-                            "type": "string",
-                            "description": "winner for this game",
-                            "enum": ["ai", "user"]
-                        },
-                        "highlight": {
-                            "type": "array",
-                            "description": "five piece's locations that cause winner win the game",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "row": {
-                                        "type": "integer",
-                                        "description": "row number of piece location"
-                                    },
-                                    "column": {
-                                        "type": "integer",
-                                        "description": "column number of piece location"
-                                    }
-                                },
-                                "required": ["row", "column"],
-                                "additionalProperties": false
-                            }
-                        }
-                    },
-                    "required": ["winner", "highlight"],
-                    "additionalProperties": false
-                }
-            },
-            "required": ["type", "win"],
+            "required": ["row", "column"],
             "additionalProperties": false
         }
     },
-    "required": ["type", "battle", "gameOver"],
+    "required": ["move", "time", "ai_win_rate", "user_win_rate"],
     "additionalProperties": false
 }
