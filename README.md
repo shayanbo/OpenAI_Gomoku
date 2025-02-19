@@ -5,7 +5,7 @@ OpenAI vs OpenAI on gomoku board game
 In Process
 
 # Issue
-OpenAI seems to not know how to play gomoku well
+GPT-4o-mini and GPT-4o seem not to know how to play Gomoku well, thinking of fine-tuning the GPT-4o-mini model with a huge of game session data
 
 # Wanna Try?
 Replace the <OPENAI_API_KEY> with the real one
