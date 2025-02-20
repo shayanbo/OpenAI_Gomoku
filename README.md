@@ -10,5 +10,6 @@ GPT-4o-mini and GPT-4o seem not to know how to play Gomoku well, thinking of fin
 # Wanna Try?
 Replace the <OPENAI_API_KEY> with the real one
 
-# UI
-<img width="549" alt="image" src="https://github.com/user-attachments/assets/4f1a69a6-1ab4-4d06-b411-d519944c0eb0" />
+# One round
+https://github.com/user-attachments/assets/515ae42d-84c9-499a-8d06-62767c750e9d
+
