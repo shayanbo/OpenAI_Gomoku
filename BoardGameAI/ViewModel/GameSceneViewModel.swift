@@ -20,10 +20,7 @@ import Combine
     @Published private(set) var player2 = GamePlayer.player2
     @Published private(set) var state: GameState = .ready
     @Published var alert: AlertState<Action>?
-    
-    /// Misc
-    private var lastStep: CellLocation?
-    
+
     /// Dependencies
     private let player1Service: OpenAIService
     private let player2Service: OpenAIService
@@ -128,17 +125,17 @@ import Combine
                 
                 /// try to get next step from ai
                 var battle = if state.player1Turn {
-                    try await player1Service.nextStep(userStep: lastStep, instruction: .nextStep, board: pieces)
+                    try await player1Service.nextStep(player1OrNot: true, instruction: .nextStep, board: pieces)
                 } else {
-                    try await player2Service.nextStep(userStep: lastStep, instruction: .nextStep, board: pieces)
+                    try await player2Service.nextStep(player1OrNot: false, instruction: .nextStep, board: pieces)
                 }
                 
                 /// get correct step if wrong
                 while pieces[battle.move] != nil {
                     if state.player1Turn {
-                        battle = try await player1Service.nextStep(userStep: battle.move, instruction: .wrongStep, board: pieces)
+                        battle = try await player1Service.nextStep(player1OrNot: true, instruction: .wrongStep, board: pieces)
                     } else {
-                        battle = try await player2Service.nextStep(userStep: battle.move, instruction: .wrongStep, board: pieces)
+                        battle = try await player2Service.nextStep(player1OrNot: false, instruction: .wrongStep, board: pieces)
                     }
                 }
 
@@ -162,9 +159,6 @@ import Combine
                 } else {
                     pieces[battle.move] = .white(selected: false)
                 }
-                
-                /// misc for the other player
-                lastStep = battle.move
                 
                 /// check win
                 let result = checkService.checkBoard(for: battle.move, in: pieces, by: state.player1Turn)

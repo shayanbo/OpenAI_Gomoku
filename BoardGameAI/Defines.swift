@@ -6,7 +6,7 @@
 //
 
 #error("replace it with the real stuff")
-let OPENAI_API_KEY = "<OPENAI_API_KEY>"
+let OPENAI_API_KEY = "<OPENAI_API_KEY"
 
 var boardSize = 10
 

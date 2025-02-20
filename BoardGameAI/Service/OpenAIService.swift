@@ -5,6 +5,10 @@
 //  Created by shayanbo on 2025/2/8.
 //
 
+/**
+ we don't need to send the whole conversation for each request unless you want, though `chat/completions` is stateless
+ */
+
 import Foundation
 
 enum AIError: Error {
@@ -23,59 +27,57 @@ enum Instruction: String {
 
 protocol OpenAIService {
     func resetSession()
-    func nextStep(userStep: CellLocation?, instruction: Instruction, board: [CellLocation: CellState]) async throws(AIError) -> AIResponse
+    func nextStep(player1OrNot: Bool, instruction: Instruction, board: [CellLocation: CellState]) async throws(AIError) -> AIResponse
 }
 
 class DefaultOpenAIService: OpenAIService {
     
-    private static let systemPrompt = """
-        You are the best Gomoku player in the world, and now you are playing it, the board is like Go consisting of \(boardSize) x \(boardSize) grid, pieces can only be placed on the intersections, which will be refered by (row, column), two players take turns placing respective pieces on the available intersection which means the intersection has no piece on. two players keep placing step by step until no more available intersections which means draw, or until either player form 5 consecutive its pieces horizantally, vertically or diagonally, which means win. Two players use different colored pieces: white, black. the player with black pieces go first. it's good to start with the middle. 
+    private var systemPrompt: String {
+        guard let path = Bundle.main.path(forResource: "system_prompt", ofType: "txt") else {
+            fatalError()
+        }
+        do {
+            var prompt = try String(contentsOfFile: path, encoding: .utf8)
+            prompt += "it consists of \(boardSize) x \(boardSize) grid"
+            return prompt
+        } catch {
+            fatalError()
+        }
+    }
     
-        Request Content:
-        - When receive next_step, it means your opponent give the next step for you
-        - When receive wrong_step, it means the intersection of your step has been occupied, please give other available step
-    
-        Trick:
-        - Pieces can only be placed on empty intersection
-        - When there is empty intersection between your pieces, fill these gap to form consecutive pieces
-        - When you have 4 same consecutive pieces horizantally, vertically or diagonally, place one pieces to form 5 pieces if possible
-        - When you have 3 same consecutive pieces horizantally, vertically or diagonally, place one pieces to form 4 pieces if possible
-        - When you have 2 same consecutive pieces horizantally, vertically or diagonally, place one pieces to form 3 pieces if possible
-        - When you have 1 same consecutive pieces horizantally, vertically or diagonally, place one pieces to form 2 pieces if possible
-        - Place piece to prevent opponent from forming consecutive pieces
-    """
-    
-    private var history = [AIMessage(role: "system", content: systemPrompt)]
     private var session = UUID()
     
     func resetSession() {
         session = UUID()
-        history = [AIMessage(role: "system", content: DefaultOpenAIService.systemPrompt)]
     }
     
-    func nextStep(userStep: CellLocation?, instruction: Instruction, board: [CellLocation: CellState]) async throws(AIError) -> AIResponse {
-        /// put user message to history
-        if let step = userStep {
-            let body = [
-                "don't return move showing up in these moves": board.description,
-                instruction.rawValue: "row:\(step.row), column:\(step.column)"
-            ]
-            history.append(AIMessage(role: "user", content: body.description))
-        }
+    func nextStep(player1OrNot: Bool, instruction: Instruction, board: [CellLocation: CellState]) async throws(AIError) -> AIResponse {
         /// request
         let currentSession = session
-        let response = try await request()
+        /// describe current board state with format [column,row,state]
+        /// state [0,1,2], 0 means `empty`, 1 means `your piece`, 2 means `opponent's piece`
+        var body = instruction == .nextStep ? "instruction:next_step, board state:" : "instruction:wrong_step, board state:"
+        (0..<boardSize).forEach { row in
+            (0..<boardSize).forEach { column in
+                let cellState = board[CellLocation(row: row, column: column)] ?? .empty
+                let state = switch cellState {
+                case .empty: 0
+                case .black: player1OrNot ? 1: 2
+                case .white: player1OrNot ? 2: 1
+                }
+                body += "[\(column),\(row),\(state)],"
+            }
+        }
+        
+        let response = try await request(body)
+        
         guard currentSession == session else {
             throw AIError.invalidSession
-        }
-        /// put ai response to history
-        if let message = response.message {
-            history.append(message)
         }
         return response
     }
     
-    func request() async throws(AIError) -> AIResponse {
+    func request(_ body: String) async throws(AIError) -> AIResponse {
         do {
             let url = URL(string: "https://api.openai.com/v1/chat/completions")!
             let request = NSMutableURLRequest(url: url)
@@ -83,7 +85,11 @@ class DefaultOpenAIService: OpenAIService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("Bearer \(OPENAI_API_KEY)", forHTTPHeaderField: "Authorization")
             
-            let data = try JSONEncoder().encode(history)
+            /// compress whole conversation history to one message to reduce token comsuption
+            let data = try JSONEncoder().encode([
+                AIMessage(role: "system", content: systemPrompt),
+                AIMessage(role: "user", content: body)
+            ])
             let messages = try JSONSerialization.jsonObject(with: data)
             
             guard let responseFormatURL = Bundle.main.url(forResource: "response_format", withExtension: "json"),
